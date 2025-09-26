@@ -1,0 +1,2817 @@
+{
+  "datasets": [
+    {
+      "name": "54b0bbdd",
+      "displayName": "Chit Payment Discounts by Provider Analysis",
+      "queryLines": [
+        "select\r\n",
+        "cl.chit_name, \r\n",
+        "cpp.provider_name, \r\n",
+        "cl.monthly_amount, \r\n",
+        "cp.payment_date,\r\n",
+        "(cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.total_tenure as discount,\r\n",
+        "cl.monthly_amount - (cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.total_tenure as paid_amount,\r\n",
+        "((cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.chit_amount) as absolute_returns_percentage\r\n",
+        "from personal_finance.default.chit_payments cp\r\n",
+        "join personal_finance.default.chit_list cl on cp.chit_id = cl.chit_id\r\n",
+        "join personal_finance.default.chit_providers cpp on cpp.provider_id = cl.provider_id"
+      ]
+    },
+    {
+      "name": "ad8bdf35",
+      "displayName": "Mutual Fund Historical Data Insights",
+      "queryLines": [
+        "with latest_nav as (\r\n",
+        "    select fund_id, nav as latest_nav, date as latest_date\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "    )\r\n",
+        "),\r\n",
+        "nav_7_days_ago as (\r\n",
+        "    select fund_id, nav as nav_7d\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "        and b.date <= current_date - interval '7' day\r\n",
+        "    )\r\n",
+        "),\r\n",
+        "nav_14_days_ago as (\r\n",
+        "    select fund_id, nav as nav_14d\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "        and b.date <= current_date - interval '14' day\r\n",
+        "    )\r\n",
+        "),\r\n",
+        "nav_30_days_ago as (\r\n",
+        "    select fund_id, nav as nav_30d\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "        and b.date <= current_date - interval '30' day\r\n",
+        "    )\r\n",
+        "),\r\n",
+        "units_summary as (\r\n",
+        "    select fund_id, sum(units) as total_units\r\n",
+        "    from personal_finance.default.mf_payments\r\n",
+        "    group by fund_id\r\n",
+        ")\r\n",
+        "\r\n",
+        "select \r\n",
+        "    mf.fund_name,\r\n",
+        "    mf.fund_house,\r\n",
+        "    us.total_units,\r\n",
+        "    round(ln.latest_nav * us.total_units, 2) as current_value,\r\n",
+        "    round(n7.nav_7d * us.total_units, 2) as value_7d_ago,\r\n",
+        "    round(n14.nav_14d * us.total_units, 2) as value_14d_ago,\r\n",
+        "    round(n30.nav_30d * us.total_units, 2) as value_30d_ago,\r\n",
+        "\r\n",
+        "    round((ln.latest_nav * us.total_units) - (n7.nav_7d * us.total_units), 2) as profit_7_days,\r\n",
+        "    round((ln.latest_nav * us.total_units) - (n14.nav_14d * us.total_units), 2) as profit_14_days,\r\n",
+        "    round((ln.latest_nav * us.total_units) - (n30.nav_30d * us.total_units), 2) as profit_30_days,\r\n",
+        "\r\n",
+        "    round(((ln.latest_nav * us.total_units) - (n7.nav_7d * us.total_units)) / nullif(n7.nav_7d * us.total_units, 0), 8) as perf_7_days_percentage,\r\n",
+        "    round(((ln.latest_nav * us.total_units) - (n14.nav_14d * us.total_units)) / nullif(n14.nav_14d * us.total_units, 0), 8) as perf_14_days_percentage,\r\n",
+        "    round(((ln.latest_nav * us.total_units) - (n30.nav_30d * us.total_units)) / nullif(n30.nav_30d * us.total_units, 0), 8) as perf_30_days_percentage,\r\n",
+        "\r\n",
+        "    round(sum((ln.latest_nav * us.total_units) - (n7.nav_7d * us.total_units)) \r\n",
+        "          over () / nullif(sum(n7.nav_7d * us.total_units) over (), 0), 8) \r\n",
+        "          as consolidated_perf_7_days_percentage,\r\n",
+        "\r\n",
+        "    round(sum((ln.latest_nav * us.total_units) - (n14.nav_14d * us.total_units)) \r\n",
+        "          over () / nullif(sum(n14.nav_14d * us.total_units) over (), 0), 8) \r\n",
+        "          as consolidated_perf_14_days_percentage,\r\n",
+        "\r\n",
+        "    round(sum((ln.latest_nav * us.total_units) - (n30.nav_30d * us.total_units)) \r\n",
+        "          over () / nullif(sum(n30.nav_30d * us.total_units) over (), 0), 8) \r\n",
+        "          as consolidated_perf_30_days_percentage\r\n",
+        "\r\n",
+        "from personal_finance.default.mf_list mf\r\n",
+        "join units_summary us on mf.fund_id = us.fund_id\r\n",
+        "left join latest_nav ln on mf.fund_id = ln.fund_id\r\n",
+        "left join nav_7_days_ago n7 on mf.fund_id = n7.fund_id\r\n",
+        "left join nav_14_days_ago n14 on mf.fund_id = n14.fund_id\r\n",
+        "left join nav_30_days_ago n30 on mf.fund_id = n30.fund_id\r\n",
+        "where (:fund_name = 'All' or mf.fund_name = :fund_name)\r\n",
+        "order by profit_7_days desc;\r\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "fund_name",
+          "keyword": "fund_name",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4c2eb2f1",
+      "displayName": "MF Analysis",
+      "queryLines": [
+        "with latest_nav as (\r\n",
+        "    select fund_id, nav, date\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "    )\r\n",
+        ")\r\n",
+        "select \r\n",
+        "    mp.fund_id, \r\n",
+        "    mf.fund_name, \r\n",
+        "    mf.fund_house, \r\n",
+        "    mp.transaction_date, \r\n",
+        "    mp.transaction_type, \r\n",
+        "    mp.units, \r\n",
+        "    ln.nav as latest_nav_price, \r\n",
+        "    ln.date as latest_nav_date,\r\n",
+        "    ln.nav * mp.units as latest_nav_value,  \r\n",
+        "    mhd.nav * mp.units as transaction_price, \r\n",
+        "    ln.nav * mp.units - mhd.nav * mp.units as profit,\r\n",
+        "    sum(mp.units * mhd.nav) over (partition by mf.fund_name) as total_invested,\r\n",
+        "    sum(mp.units * ln.nav) over (partition by mf.fund_name) as total_current_value,\r\n",
+        "    (sum(mp.units * ln.nav) over (partition by mf.fund_name) - sum(mp.units * mhd.nav) over (partition by mf.fund_name)) / sum(mp.units * mhd.nav) over (partition by mf.fund_name) * 100 as profit_percentage,\r\n",
+        "    -- Consolidated profit percentage across all funds\r\n",
+        "    (sum(mp.units * ln.nav) over () - sum(mp.units * mhd.nav) over ()) / sum(mp.units * mhd.nav) over () as consolidated_profit_percentage\r\n",
+        "from personal_finance.default.mf_payments mp\r\n",
+        "join personal_finance.default.mf_list mf on mp.fund_id = mf.fund_id\r\n",
+        "left join latest_nav ln on mp.fund_id = ln.fund_id\r\n",
+        "left join personal_finance.default.mf_historical_data mhd on mp.fund_id = mhd.fund_id and mp.transaction_date = mhd.date\r\n",
+        "order by mp.transaction_date desc;"
+      ]
+    },
+    {
+      "name": "a7dce33e",
+      "displayName": "Total Networth",
+      "queryLines": [
+        "with latest_nav as (\r\n",
+        "    select fund_id, nav, date\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "    )\r\n",
+        "),\r\n",
+        "mf_summary as (\r\n",
+        "    select\r\n",
+        "        \"Mutual Fund\" as investment_type,\r\n",
+        "        sum(mp.units * mhd.nav) as total_invested,\r\n",
+        "        sum(mp.units * ln.nav) as current_value,\r\n",
+        "        sum(mp.units * ln.nav) - sum(mp.units * mhd.nav) as total_returns\r\n",
+        "    from personal_finance.default.mf_payments mp\r\n",
+        "    join personal_finance.default.mf_list mf on mp.fund_id = mf.fund_id\r\n",
+        "    left join latest_nav ln on mp.fund_id = ln.fund_id\r\n",
+        "    left join personal_finance.default.mf_historical_data mhd on mp.fund_id = mhd.fund_id and mp.transaction_date = mhd.date\r\n",
+        "),\r\n",
+        "chit_summary as (\r\n",
+        "    select \r\n",
+        "        \"Chit Fund\" as investment_type,\r\n",
+        "        sum(cl.monthly_amount) - sum((cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.total_tenure) as total_invested,\r\n",
+        "        sum(cl.monthly_amount) as current_value,\r\n",
+        "        sum((cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.total_tenure) as total_returns\r\n",
+        "    from personal_finance.default.chit_payments cp\r\n",
+        "    join personal_finance.default.chit_list cl on cp.chit_id = cl.chit_id\r\n",
+        "    join personal_finance.default.chit_providers cpp on cpp.provider_id = cl.provider_id\r\n",
+        "),\r\n",
+        "bond_summary as (\r\n",
+        "    SELECT \"Bond\" as investment_type, \r\n",
+        "    sum(invested_amount) as total_invested, \r\n",
+        "    sum(face_value) as current_value,\r\n",
+        "    sum(face_value - invested_amount) as total_returns\r\n",
+        "    FROM personal_finance.default.bond_list \r\n",
+        "    where frequency_of_principal_repayment <> \"Quarterly\"   \r\n",
+        "),\r\n",
+        "chit_and_mf_summary as (select * from mf_summary\r\n",
+        "union all\r\n",
+        "select * from chit_summary\r\n",
+        "union all \r\n",
+        "select * from bond_summary\r\n",
+        ")\r\n",
+        "select * from chit_and_mf_summary"
+      ]
+    },
+    {
+      "name": "2502e08a",
+      "displayName": "Bond Analysis",
+      "queryLines": [
+        "SELECT * FROM personal_finance.default.bond_list;"
+      ]
+    },
+    {
+      "name": "fba1dd4f",
+      "displayName": "NetWorth Weekly Analysis",
+      "queryLines": [
+        "with latest_nav as (\r\n",
+        "    select fund_id, nav, date\r\n",
+        "    from personal_finance.default.mf_historical_data as a\r\n",
+        "    where date = (\r\n",
+        "        select max(date)\r\n",
+        "        from personal_finance.default.mf_historical_data as b\r\n",
+        "        where a.fund_id = b.fund_id\r\n",
+        "    )\r\n",
+        "),\r\n",
+        "mf_summary as (\r\n",
+        "    select\r\n",
+        "        \"Mutual Fund\" as investment_type,\r\n",
+        "        sum(mp.units * mhd.nav) as total_invested,\r\n",
+        "        sum(mp.units * ln.nav) as current_value,\r\n",
+        "        sum(mp.units * ln.nav) - sum(mp.units * mhd.nav) as total_returns,\r\n",
+        "        date_trunc('day', mp.transaction_date) as day\r\n",
+        "    from personal_finance.default.mf_payments mp\r\n",
+        "    join personal_finance.default.mf_list mf on mp.fund_id = mf.fund_id\r\n",
+        "    left join latest_nav ln on mp.fund_id = ln.fund_id\r\n",
+        "    left join personal_finance.default.mf_historical_data mhd on mp.fund_id = mhd.fund_id and mp.transaction_date = mhd.date\r\n",
+        "    group by day\r\n",
+        "),\r\n",
+        "chit_summary as (\r\n",
+        "    select \r\n",
+        "        \"Chit Fund\" as investment_type,\r\n",
+        "        sum(cl.monthly_amount) - sum((cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.total_tenure) as total_invested,\r\n",
+        "        sum(cl.monthly_amount) as current_value,\r\n",
+        "        sum((cl.chit_amount - (cp.bid_amount - (cl.chit_amount * cl.commision))) / cl.total_tenure) as total_returns,\r\n",
+        "        date_trunc('day', cp.payment_date) as day\r\n",
+        "    from personal_finance.default.chit_payments cp\r\n",
+        "    join personal_finance.default.chit_list cl on cp.chit_id = cl.chit_id\r\n",
+        "    join personal_finance.default.chit_providers cpp on cpp.provider_id = cl.provider_id\r\n",
+        "    group by day\r\n",
+        "),\r\n",
+        "bond_summary as (\r\n",
+        "    SELECT \"Bond\" as investment_type, \r\n",
+        "    sum(invested_amount) as total_invested, \r\n",
+        "    sum(face_value) as current_value,\r\n",
+        "    sum(face_value - invested_amount) as total_returns,\r\n",
+        "    date_trunc('day', date_of_investment) as day\r\n",
+        "    FROM personal_finance.default.bond_list \r\n",
+        "    where frequency_of_principal_repayment <> \"Quarterly\"\r\n",
+        "    group by day\r\n",
+        "),\r\n",
+        "chit_and_mf_summary as (\r\n",
+        "    select day, sum(total_invested) as total_invested, sum(current_value) as current_value, sum(total_returns) as total_returns\r\n",
+        "    from (\r\n",
+        "        select day, total_invested, current_value, total_returns from mf_summary\r\n",
+        "        union all\r\n",
+        "        select day, total_invested, current_value, total_returns from chit_summary\r\n",
+        "        union all \r\n",
+        "        select day, total_invested, current_value, total_returns from bond_summary\r\n",
+        "    ) as combined_summary\r\n",
+        "    group by day\r\n",
+        ")\r\n",
+        "select day, \r\n",
+        "       sum(total_invested) as total_invested, \r\n",
+        "       sum(current_value) as current_value, \r\n",
+        "       sum(total_returns) as total_returns,\r\n",
+        "       sum(sum(total_invested)) over (order by day) as cumulative_total_invested,\r\n",
+        "       sum(sum(current_value)) over (order by day) as cumulative_current_value,\r\n",
+        "       sum(sum(total_returns)) over (order by day) as cumulative_total_returns\r\n",
+        "from chit_and_mf_summary\r\n",
+        "group by day\r\n",
+        "order by day"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "51ab3fe0",
+      "displayName": "Net Worth",
+      "layout": [
+        {
+          "widget": {
+            "name": "a2e66def",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a7dce33e",
+                  "fields": [
+                    {
+                      "name": "sum(current_value)",
+                      "expression": "SUM(`current_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(current_value)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sum of current_value"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Corpus ( ₹ )",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "a13da904",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f069783d3c18fda747059b3c579720_investment_type",
+                "query": {
+                  "datasetName": "a7dce33e",
+                  "fields": [
+                    {
+                      "name": "investment_type",
+                      "expression": "`investment_type`"
+                    },
+                    {
+                      "name": "investment_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "investment_type",
+                    "displayName": "investment_type",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f069783d3c18fda747059b3c579720_investment_type"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Investment Type"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "63d6c48c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a7dce33e",
+                  "fields": [
+                    {
+                      "name": "sum(total_invested)",
+                      "expression": "SUM(`total_invested`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_invested)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sum of total_invested"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Investment ( ₹ )",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "961bb7f5",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a7dce33e",
+                  "fields": [
+                    {
+                      "name": "sum(total_returns)",
+                      "expression": "SUM(`total_returns`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_returns)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    },
+                    "hideGroupSeparator": false
+                  },
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": ">=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": "#00A972"
+                      },
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Sum of total_returns"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Returns ( ₹ )",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "65d472b7",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fba1dd4f",
+                  "fields": [
+                    {
+                      "name": "daily(day)",
+                      "expression": "DATE_TRUNC(\"DAY\", `day`)"
+                    },
+                    {
+                      "name": "cumulative_current_value",
+                      "expression": "`cumulative_current_value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(day)",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "format": {
+                    "type": "date-time",
+                    "date": "locale-short-month",
+                    "time": "locale-hour-minute"
+                  },
+                  "displayName": "Date"
+                },
+                "y": {
+                  "fieldName": "cumulative_current_value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Price ( ₹ )"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Investment Growth"
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "eb80e353",
+      "displayName": "Chit Dashboard",
+      "layout": [
+        {
+          "widget": {
+            "name": "97fead7a",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f054c99dfa12c4b6fe59887e44a458_chit_name",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "chit_name",
+                      "expression": "`chit_name`"
+                    },
+                    {
+                      "name": "chit_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "chit_name",
+                    "displayName": "chit_name",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f054c99dfa12c4b6fe59887e44a458_chit_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chit Name"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "d19a082d",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f054c99dfa12c4b6fe59887e44a458_provider_name",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "provider_name",
+                      "expression": "`provider_name`"
+                    },
+                    {
+                      "name": "provider_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "provider_name",
+                    "displayName": "provider_name",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f054c99dfa12c4b6fe59887e44a458_provider_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Provider Name"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "be305637",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f054c99dfa12c4b6fe59887e44a458_payment_date",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "payment_date",
+                      "expression": "`payment_date`"
+                    },
+                    {
+                      "name": "payment_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "payment_date",
+                    "displayName": "payment_date",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f054c99dfa12c4b6fe59887e44a458_payment_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Payment Date"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "991d5c7c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "chit_name",
+                      "expression": "`chit_name`"
+                    },
+                    {
+                      "name": "provider_name",
+                      "expression": "`provider_name`"
+                    },
+                    {
+                      "name": "payment_date",
+                      "expression": "`payment_date`"
+                    },
+                    {
+                      "name": "monthly_amount",
+                      "expression": "`monthly_amount`"
+                    },
+                    {
+                      "name": "discount",
+                      "expression": "`discount`"
+                    },
+                    {
+                      "name": "paid_amount",
+                      "expression": "`paid_amount`"
+                    },
+                    {
+                      "name": "absolute_returns_percentage",
+                      "expression": "`absolute_returns_percentage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "chit_name",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 0,
+                    "title": "Chit Name",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "chit_name"
+                  },
+                  {
+                    "fieldName": "provider_name",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "title": "Provider Name",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "provider_name"
+                  },
+                  {
+                    "fieldName": "payment_date",
+                    "dateTimeFormat": "YYYY-MM-DD",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "date",
+                    "displayAs": "datetime",
+                    "visible": true,
+                    "order": 2,
+                    "title": "Paid Date",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": null
+                      },
+                      "rules": []
+                    },
+                    "displayName": "payment_date"
+                  },
+                  {
+                    "fieldName": "monthly_amount",
+                    "numberFormat": "'$0,000.0'",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 3,
+                    "title": "Total Amount (₹)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "monthly_amount"
+                  },
+                  {
+                    "fieldName": "discount",
+                    "numberFormat": "'$0,000.0'",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 4,
+                    "title": "Discount (₹)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "discount"
+                  },
+                  {
+                    "fieldName": "paid_amount",
+                    "numberFormat": "'$0,000.0'",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 5,
+                    "title": "Paid Amount (₹)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": null
+                      },
+                      "rules": []
+                    },
+                    "displayName": "paid_amount"
+                  },
+                  {
+                    "fieldName": "absolute_returns_percentage",
+                    "numberFormat": "'0.0%'",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 6,
+                    "title": "ARP (%)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "scalePercentBy100": true,
+                    "displayName": "absolute_returns_percentage"
+                  }
+                ]
+              },
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": true,
+              "frame": {
+                "showTitle": true,
+                "title": "Payment History"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "ec685fc0",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "sum(paid_amount)",
+                      "expression": "SUM(`paid_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(paid_amount)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "all"
+                    },
+                    "hideGroupSeparator": true
+                  },
+                  "displayName": "Sum of paid_amount"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Paid (₹)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "2bc8151c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "sum(discount)",
+                      "expression": "SUM(`discount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(discount)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "all"
+                    },
+                    "hideGroupSeparator": true
+                  },
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": ">=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Sum of discount"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Profit (₹)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 3,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "43d6f3db",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "sum(monthly_amount)",
+                      "expression": "SUM(`monthly_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(monthly_amount)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "all"
+                    },
+                    "hideGroupSeparator": true
+                  },
+                  "displayName": "Sum of monthly_amount"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Receivables (₹)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "51a90531",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "avg(absolute_returns_percentage)",
+                      "expression": "AVG(`absolute_returns_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(absolute_returns_percentage)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    },
+                    "hideGroupSeparator": true
+                  },
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": ">=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Average absolute_returns_percentage"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Absolute Return (%)\n",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "2cb47f12",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "countdistinct(chit_name)",
+                      "expression": "COUNT(DISTINCT `chit_name`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "countdistinct(chit_name)",
+                  "displayName": "Count of Unique chit_name"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Chits",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "8a2fc51b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "54b0bbdd",
+                  "fields": [
+                    {
+                      "name": "monthly(payment_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `payment_date`)"
+                    },
+                    {
+                      "name": "sum(paid_amount)",
+                      "expression": "SUM(`paid_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(payment_date)",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "title": "Date"
+                  },
+                  "format": {
+                    "type": "date",
+                    "date": "locale-short-month"
+                  },
+                  "displayName": "Date"
+                },
+                "y": {
+                  "fieldName": "sum(paid_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Monthly Amount"
+                  },
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Monthly Amount"
+                }
+              },
+              "mark": {
+                "colors": [
+                  "#02E552",
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 6,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "8b3f093e",
+      "displayName": "MF Dashboard",
+      "layout": [
+        {
+          "widget": {
+            "name": "a82107b4",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f05feb71441dd8957638e0a9ecc822_fund_name",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "fund_name",
+                      "expression": "`fund_name`"
+                    },
+                    {
+                      "name": "fund_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f060090a4c167cab328e060d052746_fund_name",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "fund_name",
+                      "expression": "`fund_name`"
+                    },
+                    {
+                      "name": "fund_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "fund_name",
+                    "displayName": "fund_name",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f05feb71441dd8957638e0a9ecc822_fund_name"
+                  },
+                  {
+                    "fieldName": "fund_name",
+                    "displayName": "fund_name",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f060090a4c167cab328e060d052746_fund_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Mutual Fund Name"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f18c7fc6",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f05feb71441dd8957638e0a9ecc822_fund_house",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "fund_house",
+                      "expression": "`fund_house`"
+                    },
+                    {
+                      "name": "fund_house_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "fund_house",
+                    "displayName": "fund_house",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f05feb71441dd8957638e0a9ecc822_fund_house"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Fund House"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "efaedf2c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "sum(latest_nav_value)",
+                      "expression": "SUM(`latest_nav_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(latest_nav_value)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sum of latest_nav_value"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Liquid Cash (₹)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "df074cea",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "countdistinct(fund_id)",
+                      "expression": "COUNT(DISTINCT `fund_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "countdistinct(fund_id)",
+                  "displayName": "Count of Unique fund_id"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Total MF"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "58f9981b",
+            "queries": [
+              {
+                "name": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f05feb71441dd8957638e0a9ecc822_transaction_date",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "transaction_date",
+                      "expression": "`transaction_date`"
+                    },
+                    {
+                      "name": "transaction_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "transaction_date",
+                    "displayName": "transaction_date",
+                    "queryName": "dashboards/01f054c988ff1abfb6abf697fcf2dd36/datasets/01f05feb71441dd8957638e0a9ecc822_transaction_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Transaction Date"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "1d161a07",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "sum(transaction_price)",
+                      "expression": "SUM(`transaction_price`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(transaction_price)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sum of transaction_price"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Invested (₹)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "473d3e92",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(profit)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Sum of profit"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Profit (₹)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "9d9393e9",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "avg(consolidated_profit_percentage)",
+                      "expression": "AVG(`consolidated_profit_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(consolidated_profit_percentage)",
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": "#00A972"
+                      }
+                    ]
+                  },
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Average consolidated_profit_percentage"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Profit (%)",
+                "headerAlignment": "center"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "841e8eff",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c2eb2f1",
+                  "fields": [
+                    {
+                      "name": "fund_id",
+                      "expression": "`fund_id`"
+                    },
+                    {
+                      "name": "fund_name",
+                      "expression": "`fund_name`"
+                    },
+                    {
+                      "name": "fund_house",
+                      "expression": "`fund_house`"
+                    },
+                    {
+                      "name": "transaction_date",
+                      "expression": "`transaction_date`"
+                    },
+                    {
+                      "name": "transaction_type",
+                      "expression": "`transaction_type`"
+                    },
+                    {
+                      "name": "units",
+                      "expression": "`units`"
+                    },
+                    {
+                      "name": "transaction_price",
+                      "expression": "`transaction_price`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "fund_id",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Fund ID",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "fund_id"
+                  },
+                  {
+                    "fieldName": "fund_name",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "Fund Name",
+                    "allowSearch": true,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "fund_name"
+                  },
+                  {
+                    "fieldName": "fund_house",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "Fund House",
+                    "allowSearch": true,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "fund_house"
+                  },
+                  {
+                    "fieldName": "transaction_date",
+                    "dateTimeFormat": "YYYY-MM-DD",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "date",
+                    "displayAs": "datetime",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "Transaction Date",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "transaction_date"
+                  },
+                  {
+                    "fieldName": "transaction_type",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Transaction Type",
+                    "allowSearch": false,
+                    "alignContent": "center",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "transaction_type",
+                            "fn": "=",
+                            "literal": "SELL"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 4
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "displayName": "transaction_type"
+                  },
+                  {
+                    "fieldName": "units",
+                    "numberFormat": "0.000",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100005,
+                    "title": "Units",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "units",
+                            "fn": "<",
+                            "literal": "0"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 4
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "displayName": "units"
+                  },
+                  {
+                    "fieldName": "transaction_price",
+                    "numberFormat": "'0,000.0'",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100009,
+                    "title": "Transaction Price",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "transaction_price",
+                            "fn": "<",
+                            "literal": "0"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 4
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "displayName": "transaction_price"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "latest_nav_price",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100006,
+                  "title": "latest_nav_price",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "dateTimeFormat": "YYYY-MM-DD",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "latest_nav_date",
+                  "type": "date",
+                  "displayAs": "datetime",
+                  "order": 100007,
+                  "title": "latest_nav_date",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "latest_nav_value",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100008,
+                  "title": "latest_nav_value",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "profit",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100010,
+                  "title": "profit",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "total_invested",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100011,
+                  "title": "total_invested",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "total_current_value",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100012,
+                  "title": "total_current_value",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "profit_percentage",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100013,
+                  "title": "profit_percentage",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": true
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "fd6e0014",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "sum(profit_7_days)",
+                      "expression": "SUM(`profit_7_days`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(profit_7_days)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Sum of profit_7_days"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Past 7 Days Profit (₹)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "70edc4ac",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "sum(profit_14_days)",
+                      "expression": "SUM(`profit_14_days`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(profit_14_days)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Sum of profit_14_days"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Past 14 Days Profit (₹)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 5,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "a4965ea4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "sum(profit_30_days)",
+                      "expression": "SUM(`profit_30_days`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(profit_30_days)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "INR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "Sum of profit_30_days"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Past 30 Days Profit (₹)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 5,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "d4ad2910",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "max(consolidated_perf_7_days_percentage)",
+                      "expression": "MAX(`consolidated_perf_7_days_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(consolidated_perf_7_days_percentage)",
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Maximum consolidated_perf_7_days_percentage"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Past 7 Days Profit (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c152083e",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "avg(consolidated_perf_14_days_percentage)",
+                      "expression": "AVG(`consolidated_perf_14_days_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(consolidated_perf_14_days_percentage)",
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Average consolidated_perf_14_days_percentage"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Past 14 Days Profit (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 7,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "a60f18b3",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ad8bdf35",
+                  "fields": [
+                    {
+                      "name": "avg(consolidated_perf_30_days_percentage)",
+                      "expression": "AVG(`consolidated_perf_30_days_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(consolidated_perf_30_days_percentage)",
+                  "style": {
+                    "color": {
+                      "themeColorType": "visualizationColors",
+                      "position": 3
+                    },
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": "<=",
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          }
+                        },
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Average consolidated_perf_30_days_percentage"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "headerAlignment": "center",
+                "title": "Past 30 Days Profit (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 7,
+            "width": 2,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}
