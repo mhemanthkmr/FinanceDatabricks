@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: databricks/setup-cli@v0.13.0  # Pin to a stable version
+      - uses: databricks/setup-cli@v0.271.0  # Pin to a stable version
 
       - name: Update git folder
         run: |
