@@ -18,13 +18,13 @@ jobs:
     environment: Prod
     env:
       DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
-      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}  # Use PAT here
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v3
 
-      - uses: databricks/setup-cli@v0.271.0  # Pin to a stable version
+      - uses: databricks/setup-cli@v0.271.0
 
       - name: Update git folder
         run: |
-          databricks repos update --path /Workspace/Shared/FinanceDatabricks --branch main
+          databricks repos update /Workspace/Shared/FinanceDatabricks --branch main
